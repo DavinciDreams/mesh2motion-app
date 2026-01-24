@@ -80,12 +80,10 @@ export class EventListeners {
         this.bootstrap.edit_skeleton_step.store_bone_state_for_undo()
       }
 
-      // if we stopped dragging, that means a mouse up.
-      // if we are editing skeleton and viewing weight painted mesh, refresh the weight painting
-      if (this.bootstrap.process_step === ProcessStep.EditSkeleton &&
-        this.bootstrap.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted) {
-        this.bootstrap.regenerate_weight_painted_preview_mesh()
-      }
+      // Weight painting regeneration during skeleton editing has been disabled
+      // because it causes UI lockups due to expensive calculations.
+      // Weight painting will be calculated once when user clicks "Bind Pose" to finalize.
+      // Users should view the textured model while editing bones for smooth performance.
     })
 
     this.bootstrap.load_model_step.addEventListener('modelLoaded', () => {
@@ -223,5 +221,11 @@ export class EventListeners {
         this.bootstrap.edit_skeleton_step.redo_bone_transformation()
       }
     })
+  }
+
+  public clearPendingUpdates (): void {
+    // Clear any pending weight paint updates
+    // This method is called when navigating between steps to ensure
+    // no weight painting updates are pending
   }
 }

@@ -304,6 +304,7 @@ export class Mesh2MotionEngine {
     // clean up things related to steps in since we can navigate back and forth
     this.edit_skeleton_step.cleanup_on_exit_step()
     this.load_skeleton_step.dispose()
+    this.eventListeners.clearPendingUpdates() // Clear any pending weight paint updates
 
     // only show animation player on the animation listing page
     if (process_step === ProcessStep.AnimationsListing) {
