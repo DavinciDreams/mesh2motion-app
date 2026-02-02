@@ -138,6 +138,8 @@ export class AnimationLoader extends EventTarget {
         ]
       case SkeletonType.Quadraped:
         return [`${base_path}quad-creature-animations.glb`]
+      case SkeletonType.Horse:
+        return [`${base_path}horse-animations.glb`]
       case SkeletonType.Bird:
         return [`${base_path}bird-animations.glb`]
       case SkeletonType.Dragon:
