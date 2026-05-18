@@ -1,2 +1,44 @@
 **/node_modules/**
 dist/**
+
+# Local tool configs
+.claude/
+.mcp.json
+.roomodes
+
+# Python scratch
+__pycache__/
+*.pyc
+tmp_*.py
+temp_*.py
+
+# Temp asset folders
+tmp-dgx-assets/
+horse assets/
+
+# Loose experimental GLBs at static/ root (only the organized
+# static/animations, static/models, static/rigs folders are tracked)
+static/*.glb
+static/reference-images/
+static/reference-images.html
+static/lion-viewer.html
+static/tank-animals/
+static/riganything anmals/
+static/riganything animals/
+
+# Scratch HTML test pages
+test-horse-*.html
+test-horse-*.mjs
+test-horse-*.py
+test_glb_files.py
+
+# Scratch Blender export iterations (keepers live in scripts/)
+export_horse_assets.py
+export_horse_complete.py
+export_horse_diagnostic.py
+export_horse_mesh_only.py
+export_horse_rig_restpose.py
+export_horse_simple.py
+export_rig_from_model.py
+export_rig_headless.py
+scripts/__pycache__/
