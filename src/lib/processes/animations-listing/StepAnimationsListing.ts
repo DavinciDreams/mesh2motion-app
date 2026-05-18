@@ -429,12 +429,12 @@ export class StepAnimationsListing extends EventTarget {
       this.ui.dom_animation_clip_list.addEventListener('click', (event) => {
         this.update_download_button_enabled()
 
-        if ((event.target != null) && (event.target as HTMLElement).tagName === 'BUTTON') {
-          const animation_index_str = (event.target as HTMLElement).getAttribute('data-index')
-          if (animation_index_str != null) {
-            const animation_index: number = Number(animation_index_str)
-            this.play_animation(animation_index)
-          }
+        const target = event.target as HTMLElement | null
+        const play_button = target?.closest('.play') as HTMLButtonElement | null
+        const animation_index_str = play_button?.dataset.index
+        if (animation_index_str != null) {
+          const animation_index: number = Number(animation_index_str)
+          this.play_animation(animation_index)
         }
       })
     }
