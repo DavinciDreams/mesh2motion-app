@@ -441,6 +441,22 @@ export class StepLoadModel extends EventTarget {
     return this.final_mesh_data
   }
 
+  /**
+   * Longest axis (x/y/z) of the loaded mesh's bounding box, in world units.
+   * Used to auto-fit the preset skeleton to the model. Returns 0 when no mesh
+   * is loaded yet.
+   */
+  public model_longest_dimension (): number {
+    if (this.final_mesh_data.children.length === 0) {
+      return 0
+    }
+    const bounding_box = ModelCleanupUtility.calculate_bounding_box(this.final_mesh_data)
+    const width = bounding_box.max.x - bounding_box.min.x
+    const height = bounding_box.max.y - bounding_box.min.y
+    const depth = bounding_box.max.z - bounding_box.min.z
+    return Math.max(width, height, depth)
+  }
+
   public models_geometry_list (): BufferGeometry[] {
     // loop through final mesh data and return the geometeries
     const geometries_to_return: BufferGeometry[] = []
