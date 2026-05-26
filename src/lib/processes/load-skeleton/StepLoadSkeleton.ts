@@ -1,5 +1,5 @@
 import { UI } from '../../UI.ts'
-import { Object3D, type Scene, type Object3DEventMap } from 'three'
+import { Box3, Object3D, Vector3, type Scene, type Object3DEventMap } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { SkeletonType, type HandSkeletonType } from '../../enums/SkeletonType.js'
 import { RigConfig } from '../../RigConfig.ts'
@@ -21,6 +21,14 @@ export class StepLoadSkeleton extends EventTarget {
   // this is useful since position keyframes will need to be scaled
   // to prevent large offsets
   private skeleton_scale_percentage: number = 1.0
+
+  // longest-axis size of the loaded model, set by the engine when entering this
+  // step. Used to auto-fit the preset skeleton to the model on selection.
+  private model_longest_dimension: number = 0
+
+  // once the user drags the scale slider we stop overriding their value with
+  // auto-fit when they switch hand options etc.
+  private user_overrode_scale: boolean = false
 
   // this was invented since this value is stored on a DOM element
   // this helps the marketing page set the type and doesn't rely on a DOM value
@@ -66,13 +74,11 @@ export class StepLoadSkeleton extends EventTarget {
     }
 
     // when we come back to this step, there is a good chance we already selected a skeleton
-    // so just use that and load the preview right when we enter this step
+    // so just use that and load the preview right when we enter this step. Auto-fit
+    // handles the first-entry case (uses model size); if the user already tuned the
+    // scale, auto_fit_skeleton_to_model preserves their value.
     if (!this.has_select_skeleton_ui_option()) {
-      add_preview_skeleton(this._main_scene, this.skeleton_file_path(),
-        this.hand_skeleton_type(), this.skeleton_scale_percentage).catch((err) => {
-        console.error('error loading preview skeleton: ', err)
-      })
-
+      this.auto_fit_skeleton_to_model(this.skeleton_file_path())
     }
 
     // Initialize hand skeleton hand options visibility
@@ -144,15 +150,11 @@ export class StepLoadSkeleton extends EventTarget {
         if (this.ui.dom_scale_skeleton_controls !== null) {
           this.ui.dom_scale_skeleton_controls.style.display = 'flex'
         }
-        // load the preview skeleton
-        // need to get the file name for the correct skeleton
-        // we pass the skeleton scale in the case where we set a skeleton, change scale, then change the skeleton
-        add_preview_skeleton(this._main_scene, this.skeleton_file_path(), this.hand_skeleton_type(), this.skeleton_scale()).then(() => {
-          // enable the ability to progress to next step
-          this.allow_proceeding_to_next_step(true)
-        }).catch((err) => {
-          console.error('error loading preview skeleton: ', err)
-        })
+        // load the preview skeleton, auto-fitting it to the loaded model's size.
+        // auto_fit_skeleton_to_model respects a manual scale override if the user
+        // already dragged the slider, and falls back to the current scale when
+        // there is no model size to fit against.
+        this.auto_fit_skeleton_to_model(this.skeleton_file_path())
       })
     }
 
@@ -182,20 +184,31 @@ export class StepLoadSkeleton extends EventTarget {
 
     // scale skeleton controls
     this.ui.dom_scale_skeleton_input?.addEventListener('input', (event) => {
+      // a manual drag means the user is taking control of the scale; stop
+      // auto-fitting on subsequent skeleton/hand changes
+      this.user_overrode_scale = true
       // range sliders have rounding errors, so we round the value to avoid issues
       const new_value: number = Number((event.target as HTMLInputElement).value)
       this.update_skeleton_scale_to_value(new_value)
     })
 
-    // reset the skeleton scale button
+    // reset the skeleton scale button: hand control back to auto-fit
     this.ui.dom_reset_skeleton_scale_button?.addEventListener('click', () => {
-      this.update_skeleton_scale_to_value(1.0)
+      this.user_overrode_scale = false
+      this.auto_fit_skeleton_to_model(this.skeleton_file_path())
     })
 
   }
 
   private update_skeleton_scale_to_value (new_value: number): void {
     this.skeleton_scale_percentage = Number(new_value)
+
+    // reflect the value on the slider itself (auto-fit sets this programmatically,
+    // and the input event only fires on user drag, not on programmatic change)
+    if (this.ui.dom_scale_skeleton_input !== null) {
+      this.ui.dom_scale_skeleton_input.value = String(new_value)
+    }
+
     const display_value: string = Math.round(new_value * 100).toString() + '%'
 
     if (this.ui.dom_scale_skeleton_percentage_display !== null) {
@@ -205,6 +218,83 @@ export class StepLoadSkeleton extends EventTarget {
       .catch((err) => {
         console.error('error loading preview skeleton: ', err)
       })
+  }
+
+  /**
+   * Called by the engine when entering this step. Records the longest dimension
+   * of the loaded model so we can auto-fit the preset skeleton to it.
+   */
+  public set_model_size (model_longest_dimension: number): void {
+    this.model_longest_dimension = model_longest_dimension
+  }
+
+  /**
+   * Loads the chosen rig at scale 1, measures its longest dimension, and returns
+   * the uniform scale that makes the skeleton's longest axis match the model's.
+   * Returns null when we can't compute a meaningful fit (no model size known,
+   * or a degenerate skeleton bounding box).
+   */
+  private async compute_auto_fit_scale (skeleton_type: SkeletonType): Promise<number | null> {
+    if (this.model_longest_dimension <= 0) {
+      return null
+    }
+
+    // add_preview_skeleton returns the loaded rig scene; render it at scale 1 so
+    // the returned object's bounding box reflects the rig's native size.
+    const loaded_scene = await add_preview_skeleton(
+      this._main_scene, skeleton_type, this.hand_skeleton_type(), 1.0
+    )
+
+    const skeleton_box = new Box3().setFromObject(loaded_scene)
+    const skeleton_size = new Vector3()
+    skeleton_box.getSize(skeleton_size)
+    const skeleton_longest = Math.max(skeleton_size.x, skeleton_size.y, skeleton_size.z)
+
+    if (!isFinite(skeleton_longest) || skeleton_longest <= 0) {
+      return null
+    }
+
+    const raw_fit = this.model_longest_dimension / skeleton_longest
+
+    // keep the fit within the scale slider's range so the slider thumb and the
+    // percentage display stay consistent with the applied scale
+    return this.clamp_to_slider_range(raw_fit)
+  }
+
+  private clamp_to_slider_range (value: number): number {
+    const slider = this.ui.dom_scale_skeleton_input
+    const min = slider !== null ? Number(slider.min) : 0.1
+    const max = slider !== null ? Number(slider.max) : 2.0
+    return Math.min(Math.max(value, min), max)
+  }
+
+  /**
+   * Auto-fit the preset skeleton to the loaded model by matching longest axes,
+   * unless the user has already manually adjusted the scale. The manual slider
+   * and per-joint editing remain available afterward for fine-tuning.
+   */
+  private auto_fit_skeleton_to_model (skeleton_type: SkeletonType): void {
+    if (this.user_overrode_scale) {
+      // user has taken control of the scale; don't stomp their value
+      add_preview_skeleton(this._main_scene, skeleton_type, this.hand_skeleton_type(), this.skeleton_scale())
+        .then(() => { this.allow_proceeding_to_next_step(true) })
+        .catch((err) => { console.error('error loading preview skeleton: ', err) })
+      return
+    }
+
+    this.compute_auto_fit_scale(skeleton_type)
+      .then((fit_scale) => {
+        if (fit_scale === null) {
+          // no model size to fit against; just show the rig at current scale
+          return add_preview_skeleton(this._main_scene, skeleton_type, this.hand_skeleton_type(), this.skeleton_scale())
+            .then(() => undefined)
+        }
+        // update_skeleton_scale_to_value reloads the preview at the fit scale
+        this.update_skeleton_scale_to_value(fit_scale)
+        return undefined
+      })
+      .then(() => { this.allow_proceeding_to_next_step(true) })
+      .catch((err) => { console.error('error auto-fitting skeleton: ', err) })
   }
 
   public load_skeleton_file (file_path: string): void {

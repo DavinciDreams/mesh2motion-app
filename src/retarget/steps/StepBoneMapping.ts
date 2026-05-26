@@ -4,12 +4,14 @@ import { MixamoMapper } from '../bone-automap/MixamoMapper.ts'
 import { RigifyMapper } from '../bone-automap/RigifyMapper.ts'
 import { AnimationRetargetService } from '../AnimationRetargetService.ts'
 import { Mesh2MotionMapper } from '../bone-automap/Mesh2MotionMapper.ts'
+import { SpatialBoneMapper } from '../bone-automap/SpatialBoneMapper.ts'
 
 // when we are auto-mapping, keep track of what rig type we matched target against
 export enum TargetBoneMappingType {
   Mixamo = 'mixamo',
   Rigify = 'rigify',
   Mesh2Motion = 'mesh2motion',
+  Generated = 'generated',
   Custom = 'custom', // trying to figure out bone mappings with bone name analysis
   None = 'none'
   // TODO: Add more types later
@@ -369,6 +371,9 @@ export class StepBoneMapping extends EventTarget {
     } else if (mapping_type === TargetBoneMappingType.Rigify) {
       this.auto_bone_map_match_display.style.display = 'inline'
       this.auto_bone_map_match_display.textContent = '✨ Rigify'
+    } else if (mapping_type === TargetBoneMappingType.Generated) {
+      this.auto_bone_map_match_display.style.display = 'inline'
+      this.auto_bone_map_match_display.textContent = 'Generated rig'
     } else if (mapping_type === TargetBoneMappingType.Mesh2Motion) {
       this.auto_bone_map_match_display.style.display = 'inline'
       this.auto_bone_map_match_display.textContent = '✨ Mesh2Motion'
@@ -436,6 +441,8 @@ export class StepBoneMapping extends EventTarget {
       this.get_target_bone_names()
     )) {
       retarget_service.set_target_mapping_type(TargetBoneMappingType.Mesh2Motion)
+    } else if (SpatialBoneMapper.is_likely_generated_skeleton(target_bone_names)) {
+      retarget_service.set_target_mapping_type(TargetBoneMappingType.Generated)
     } else {
       retarget_service.set_target_mapping_type(TargetBoneMappingType.Custom)
     }

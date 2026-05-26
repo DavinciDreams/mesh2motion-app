@@ -391,6 +391,10 @@ export class Mesh2MotionEngine {
       // enable model position gizmo so user can freely position the model
       this.enable_model_gizmo()
 
+      // hand the model's size to the skeleton step so it can auto-fit the preset
+      // skeleton to the model on selection
+      this.load_skeleton_step.set_model_size(this.load_model_step.model_longest_dimension())
+
       // finish initialization and add origin markers
       // this needs to happen at the end since it is expecting the mesh data
       this.load_skeleton_step.begin()

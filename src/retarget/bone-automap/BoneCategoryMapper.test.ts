@@ -11,7 +11,7 @@ function create_bone_metadata (
   side: BoneSide = BoneSide.Center,
   category: BoneCategory = BoneCategory.Torso
 ): BoneMetadata {
-  return { name, normalized_name, side, category }
+  return { name, normalized_name, side, category, parent_name: null }
 }
 
 describe('BoneCategoryMapper', () => {

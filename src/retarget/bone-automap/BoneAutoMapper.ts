@@ -1,9 +1,10 @@
-import { Bone, Group, Object3D, Scene, SkinnedMesh } from 'three'
+import { Bone, Group, Object3D, Scene, SkinnedMesh, Vector3 } from 'three'
 import { BoneCategoryMapper } from './BoneCategoryMapper'
 import { MixamoMapper } from './MixamoMapper'
 import { RigifyMapper } from './RigifyMapper'
 import { TargetBoneMappingType } from '../steps/StepBoneMapping'
 import { AnimationRetargetService } from '../AnimationRetargetService'
+import { SpatialBoneMapper } from './SpatialBoneMapper.ts'
 
 /**
  * Bone categories for grouping bones by anatomical area
@@ -37,6 +38,7 @@ export interface BoneMetadata {
   side: BoneSide // Which side of the body
   category: BoneCategory // Anatomical category
   parent_name: string | null // Name of parent bone, null if root
+  world_position?: [number, number, number] // Rest world position used by generated-rig spatial matching
 }
 
 /**
@@ -91,6 +93,12 @@ export class BoneAutoMapper {
     if (retarget_service.get_target_mapping_type() === TargetBoneMappingType.Rigify) {
       console.log('Target skeleton appears to be a Rigify rig, performing direct name mapping...')
       mappings = RigifyMapper.map_rigify_bones(source_bones_meta, target_bones_meta)
+      return mappings
+    }
+
+    if (retarget_service.get_target_mapping_type() === TargetBoneMappingType.Generated) {
+      console.log('Target skeleton appears to be generated, performing spatial bone mapping...')
+      mappings = SpatialBoneMapper.map_by_normalized_world_positions(source_bones_meta, target_bones_meta)
       return mappings
     }
 
@@ -192,18 +200,22 @@ export class BoneAutoMapper {
     }
 
     // create metadata for each bone
+    armature.updateMatrixWorld(true)
     for (const bone of bones) {
       const bone_name: string = bone.name
       const parent_name: string | null = (bone.parent !== null) ? bone.parent.name : null
       const normalized_name: string = this.normalize_bone_name(bone_name)
       const side: BoneSide = this.detect_bone_side(bone_name)
       const category: BoneCategory = this.detect_bone_category(normalized_name)
+      const world_position = new Vector3()
+      bone.getWorldPosition(world_position)
       const metadata: BoneMetadata = {
         name: bone_name,
         normalized_name,
         side,
         category,
-        parent_name
+        parent_name,
+        world_position: [world_position.x, world_position.y, world_position.z]
       }
       metadata_list.push(metadata)
     }
