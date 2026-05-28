@@ -15,6 +15,8 @@ export enum SkeletonType {
   Deer = 'deer',
   Donkey = 'donkey',
   FoxQ = 'foxq',
+  GermanShepherd = 'german-shepherd',
+  AnimatedHorse = 'animated-horse',
   HorseQ = 'horseq',
   HorseWhite = 'horsewhite',
   Husky = 'husky',

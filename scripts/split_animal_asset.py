@@ -29,6 +29,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Absolute path to source .gltf file")
     parser.add_argument("--slug", required=True, help="Lowercase animal slug, e.g. 'wolf' or 'horse_white'")
     parser.add_argument("--project-root", default=None, help="Project root (defaults to script's parent.parent)")
+    parser.add_argument("--preserve-axis", action="store_true", help="Do not force glTF Y-up conversion on export")
+    parser.add_argument("--skip-animations", action="store_true", help="Only export rig and model")
     return parser.parse_args(argv)
 
 
@@ -72,6 +74,18 @@ def skinned_mesh_for(armature):
     return candidates[0][2]
 
 
+def skinned_meshes_for(armature):
+    meshes = []
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        skinned = any(m.type == "ARMATURE" and m.object == armature for m in obj.modifiers)
+        parented = obj.parent == armature
+        if skinned or parented:
+            meshes.append(obj)
+    return meshes
+
+
 def select_only(obj) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
@@ -84,6 +98,11 @@ def select_only_many(objs) -> None:
         obj.select_set(True)
     if objs:
         bpy.context.view_layer.objects.active = objs[0]
+
+
+def apply_object_transforms(objs) -> None:
+    select_only_many(objs)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 
 
 def ensure_actions_on_nla(armature) -> int:
@@ -110,7 +129,7 @@ def ensure_actions_on_nla(armature) -> int:
     return added
 
 
-def export_rig(out_path: Path, armature) -> None:
+def export_rig(out_path: Path, armature, export_yup: bool = True) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     select_only(armature)
     bpy.ops.export_scene.gltf(
@@ -124,15 +143,15 @@ def export_rig(out_path: Path, armature) -> None:
         export_cameras=False,
         export_lights=False,
         export_apply=True,
-        export_yup=True,
+        export_yup=export_yup,
         export_animations=False,
     )
 
 
-def export_model(out_path: Path, mesh, armature) -> None:
+def export_model(out_path: Path, meshes, armature, export_yup: bool = True) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # Export both armature and mesh so skin data is preserved; animations excluded.
-    select_only_many([armature, mesh])
+    select_only_many([armature, *meshes])
     bpy.ops.export_scene.gltf(
         filepath=str(out_path),
         export_format="GLB",
@@ -144,12 +163,12 @@ def export_model(out_path: Path, mesh, armature) -> None:
         export_cameras=False,
         export_lights=False,
         export_apply=False,
-        export_yup=True,
+        export_yup=export_yup,
         export_animations=False,
     )
 
 
-def export_animations(out_path: Path, armature) -> None:
+def export_animations(out_path: Path, armature, export_yup: bool = True) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     select_only(armature)
     bpy.ops.export_scene.gltf(
@@ -163,7 +182,7 @@ def export_animations(out_path: Path, armature) -> None:
         export_cameras=False,
         export_lights=False,
         export_apply=True,
-        export_yup=True,
+        export_yup=export_yup,
         export_animations=True,
         export_animation_mode="ACTIONS",
         export_nla_strips=True,
@@ -198,25 +217,32 @@ def main() -> int:
         print(f"ERROR [{slug}]: no armature found in {input_path}", file=sys.stderr)
         return 2
     mesh = skinned_mesh_for(armature)
+    meshes = skinned_meshes_for(armature)
 
     if mesh is None:
         print(f"ERROR [{slug}]: no mesh found in {input_path}", file=sys.stderr)
         return 3
+    if len(meshes) == 0:
+        meshes = [mesh]
 
     print(f"[{slug}] Armature: {armature.name!r} ({len(armature.data.bones)} bones)")
-    print(f"[{slug}] Mesh:     {mesh.name!r} ({len(mesh.data.vertices)} verts)")
+    print(f"[{slug}] Meshes:   {', '.join(f'{m.name} ({len(m.data.vertices)} verts)' for m in meshes)}")
+    apply_object_transforms([armature, *meshes])
 
     action_count = ensure_actions_on_nla(armature)
     print(f"[{slug}] Pushed {action_count} action(s) onto NLA tracks for export")
 
-    export_rig(rig_out, armature)
+    export_yup = not args.preserve_axis
+
+    export_rig(rig_out, armature, export_yup=export_yup)
     print(f"[{slug}] Wrote rig:        {rig_out.relative_to(project_root)} ({rig_out.stat().st_size // 1024} KB)")
 
-    export_model(model_out, mesh, armature)
+    export_model(model_out, meshes, armature, export_yup=export_yup)
     print(f"[{slug}] Wrote model:      {model_out.relative_to(project_root)} ({model_out.stat().st_size // 1024} KB)")
 
-    export_animations(anims_out, armature)
-    print(f"[{slug}] Wrote animations: {anims_out.relative_to(project_root)} ({anims_out.stat().st_size // 1024} KB)")
+    if not args.skip_animations:
+        export_animations(anims_out, armature, export_yup=export_yup)
+        print(f"[{slug}] Wrote animations: {anims_out.relative_to(project_root)} ({anims_out.stat().st_size // 1024} KB)")
 
     return 0
 
