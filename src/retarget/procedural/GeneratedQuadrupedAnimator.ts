@@ -24,6 +24,15 @@ export interface ProceduralChainDebugInfo {
   bones: string[]
 }
 
+export type LegSlot = 'fl' | 'fr' | 'rl' | 'rr'
+
+export interface LegAssignment {
+  fl: string
+  fr: string
+  rl: string
+  rr: string
+}
+
 export class GeneratedQuadrupedAnimator {
   private readonly skinned_mesh: THREE.SkinnedMesh
   private readonly rest_quaternions: Map<string, THREE.Quaternion> = new Map()
@@ -44,6 +53,61 @@ export class GeneratedQuadrupedAnimator {
 
   public leg_chain_count (): number {
     return this.leg_chains.length
+  }
+
+  public get_leg_assignments (): LegAssignment | null {
+    if (this.leg_chains.length < 4) return null
+    const find = (side: 'left' | 'right', end: 'front' | 'back'): string | null => {
+      const chain = this.leg_chains.find(c => c.side === side && c.end === end)
+      const foot = chain?.bones[chain.bones.length - 1]
+      return foot?.name ?? null
+    }
+    const fl = find('left', 'front')
+    const fr = find('right', 'front')
+    const rl = find('left', 'back')
+    const rr = find('right', 'back')
+    if (fl === null || fr === null || rl === null || rr === null) return null
+    return { fl, fr, rl, rr }
+  }
+
+  public get_all_bone_names (): string[] {
+    return this.skinned_mesh.skeleton.bones.map(bone => bone.name)
+  }
+
+  public set_leg_chains_from_feet (assignment: LegAssignment): boolean {
+    const bones = this.skinned_mesh.skeleton.bones
+    const lookup = new Map(bones.map(bone => [bone.name, bone]))
+
+    const build_chain = (foot_name: string, side: 'left' | 'right', end: 'front' | 'back'): LegChain | null => {
+      const foot = lookup.get(foot_name)
+      if (foot === undefined) return null
+      const ancestors = this.chain_to_root(foot)
+      const chain_bones = ancestors.slice(-Math.min(4, ancestors.length))
+      if (chain_bones.length < 2) return null
+      return { bones: chain_bones, side, end, phase: 0 }
+    }
+
+    const fl_chain = build_chain(assignment.fl, 'left', 'front')
+    const fr_chain = build_chain(assignment.fr, 'right', 'front')
+    const rl_chain = build_chain(assignment.rl, 'left', 'back')
+    const rr_chain = build_chain(assignment.rr, 'right', 'back')
+
+    if (fl_chain === null || fr_chain === null || rl_chain === null || rr_chain === null) return false
+
+    this.leg_chains = [fl_chain, fr_chain, rl_chain, rr_chain]
+    this.head_chain = this.detect_head_chain()
+    this.tail_chain = this.detect_tail_chain()
+    return true
+  }
+
+  public reset_to_auto_detection (): void {
+    this.leg_chains = this.detect_leg_chains()
+    this.head_chain = this.detect_head_chain()
+    this.tail_chain = this.detect_tail_chain()
+  }
+
+  public skeleton_signature (): string {
+    return this.skinned_mesh.skeleton.bones.map(bone => bone.name).sort().join('|')
   }
 
   public debug_chains (): ProceduralChainDebugInfo[] {
@@ -506,7 +570,7 @@ export class GeneratedQuadrupedAnimator {
     const height = Math.max(max_y - min_y, 0.0001)
     const leaves = bones.filter(bone => this.bone_children(bone).length === 0)
 
-    const candidates = leaves
+    const all_candidates = leaves
       .map((leaf) => {
         const chain = this.chain_to_root(leaf)
         const root_position = world_positions.get(chain[0]) ?? new THREE.Vector3()
@@ -518,24 +582,34 @@ export class GeneratedQuadrupedAnimator {
           low_score: (leaf_position.y - min_y) / height
         }
       })
-      .filter(candidate => candidate.chain.length >= 3 && candidate.drop > height * 0.22 && candidate.low_score < 0.45)
+      .filter(candidate => candidate.chain.length >= 3)
       .sort((a, b) => {
         if (a.low_score !== b.low_score) return a.low_score - b.low_score
         return b.drop - a.drop
       })
 
-    const selected: typeof candidates = []
-    for (const candidate of candidates) {
-      const too_close = selected.some(existing =>
-        existing.leaf_position.distanceTo(candidate.leaf_position) < height * 0.18
+    const pick_with_thresholds = (drop_min: number, low_max: number): typeof all_candidates => {
+      const passed = all_candidates.filter(candidate =>
+        candidate.drop > height * drop_min && candidate.low_score < low_max
       )
-      if (!too_close) selected.push(candidate)
-      if (selected.length === 4) break
+      const selected: typeof all_candidates = []
+      for (const candidate of passed) {
+        const too_close = selected.some(existing =>
+          existing.leaf_position.distanceTo(candidate.leaf_position) < height * 0.12
+        )
+        if (!too_close) selected.push(candidate)
+        if (selected.length === 4) break
+      }
+      return selected
     }
+
+    let selected = pick_with_thresholds(0.22, 0.45)
+    if (selected.length < 4) selected = pick_with_thresholds(0.12, 0.6)
+    if (selected.length < 4) selected = pick_with_thresholds(0.05, 0.75)
 
     const fallback = selected.length >= 4
       ? selected
-      : candidates.slice(0, 4)
+      : all_candidates.slice(0, 4)
 
     if (fallback.length === 0) return []
 
@@ -550,7 +624,7 @@ export class GeneratedQuadrupedAnimator {
         : Math.PI
 
       return {
-        bones: candidate.chain.slice(-4),
+        bones: candidate.chain.slice(-Math.min(4, candidate.chain.length)),
         side,
         end,
         phase: diagonal_phase

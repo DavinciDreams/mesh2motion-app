@@ -200,6 +200,20 @@ export class EventListeners {
       this.bootstrap.set_model_rotation_snap(value === 'none' ? null : Number(value))
     })
 
+    this.bootstrap.ui.dom_mesh_drag_placement_checkbox?.addEventListener('change', (event: Event) => {
+      const is_checked = (event.target as HTMLInputElement | null)?.checked ?? false
+      if (!is_checked) {
+        return
+      }
+
+      const translate_radio = this.bootstrap.ui.dom_transform_type_radio_group
+        ?.querySelector('input[value="translate"]') as HTMLInputElement | null
+      if (translate_radio !== null) {
+        translate_radio.checked = true
+      }
+      this.bootstrap.changed_transform_controls_mode('translate')
+    })
+
     // Auto-align model to floor
     this.bootstrap.ui.dom_auto_align_model_button?.addEventListener('click', () => {
       // move the mesh geometry data to the floor

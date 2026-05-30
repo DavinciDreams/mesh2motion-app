@@ -246,7 +246,7 @@ export class StepEditSkeleton extends EventTarget {
       return
     }
 
-    this.ui.dom_transform_manual_options.style.display = this.mesh_drag_placement_enabled ? 'none' : 'flex'
+    this.ui.dom_transform_manual_options.style.display = 'flex'
   }
 
   public is_bone_selectable (bone: Bone | null): boolean {

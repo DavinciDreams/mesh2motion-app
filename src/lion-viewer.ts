@@ -5,6 +5,8 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import {
   GeneratedQuadrupedAnimator,
+  type LegAssignment,
+  type LegSlot,
   type ProceduralQuadrupedMode,
   type ProceduralQuadrupedSettings
 } from './retarget/procedural/GeneratedQuadrupedAnimator.ts'
@@ -96,6 +98,20 @@ const custom_model_input = document.querySelector('#custom-model-input') as HTML
 const animal_kingdom_select = document.querySelector('#animal-kingdom-select') as HTMLSelectElement | null
 const swap_front_back_button = document.querySelector('#swap-front-back') as HTMLButtonElement
 const reset_map_button = document.querySelector('#reset-map') as HTMLButtonElement
+const assign_legs_button = document.querySelector('#assign-legs') as HTMLButtonElement | null
+const auto_detect_legs_button = document.querySelector('#auto-detect-legs') as HTMLButtonElement | null
+
+const LEG_SLOT_ORDER: LegSlot[] = ['fl', 'fr', 'rl', 'rr']
+const LEG_SLOT_LABELS: Record<LegSlot, string> = {
+  fl: 'Front-Left',
+  fr: 'Front-Right',
+  rl: 'Rear-Left',
+  rr: 'Rear-Right'
+}
+const LEG_ASSIGNMENTS_STORAGE_KEY = 'm2m.proc.leg_assignments'
+let leg_assign_mode_active = false
+let leg_assign_pending: Partial<LegAssignment> = {}
+let leg_assign_step_index = 0
 const mapping_table = document.querySelector('#mapping-table') as HTMLTableSectionElement
 const mapping_source_header = document.querySelector('#mapping-source-header') as HTMLTableCellElement
 const bone_tooltip = document.querySelector('#bone-tooltip') as HTMLDivElement
@@ -221,21 +237,14 @@ const labels: Record<LionKind, string> = {
 }
 
 const animal_kingdom_sources: Record<string, SourceAnimationData> = {
-  alpaca: { key: 'alpaca', label: 'Alpaca source', rig: '/rigs/rig-alpaca.glb', animations: '/animations/alpaca-animations.glb' },
   bird: { key: 'bird', label: 'Bird source', rig: '/rigs/rig-bird.glb', animations: '/animations/bird-animations.glb' },
   bull: { key: 'bull', label: 'Bull source', rig: '/rigs/rig-bull.glb', animations: '/animations/bull-animations.glb' },
-  cow: { key: 'cow', label: 'Cow source', rig: '/rigs/rig-cow.glb', animations: '/animations/cow-animations.glb' },
-  deer: { key: 'deer', label: 'Deer source', rig: '/rigs/rig-deer.glb', animations: '/animations/deer-animations.glb' },
-  donkey: { key: 'donkey', label: 'Donkey source', rig: '/rigs/rig-donkey.glb', animations: '/animations/donkey-animations.glb' },
   dragon: { key: 'dragon', label: 'Dragon source', rig: '/rigs/rig-dragon.glb', animations: '/animations/dragon-animations.glb' },
   fox: { key: 'fox', label: 'Fox source', rig: '/rigs/rig-fox.glb', animations: '/animations/fox-animations.glb' },
-  foxq: { key: 'foxq', label: 'Fox quadruped source', rig: '/rigs/rig-foxq.glb', animations: '/animations/foxq-animations.glb' },
   horseq: { key: 'horseq', label: 'Horse source', rig: '/rigs/rig-horseq.glb', animations: '/animations/horseq-animations.glb' },
-  horsewhite: { key: 'horsewhite', label: 'White horse source', rig: '/rigs/rig-horsewhite.glb', animations: '/animations/horsewhite-animations.glb' },
   husky: { key: 'husky', label: 'Husky source', rig: '/rigs/rig-husky.glb', animations: '/animations/husky-animations.glb' },
   kaiju: { key: 'kaiju', label: 'Kaiju source', rig: '/rigs/rig-kaiju.glb', animations: '/animations/kaiju-animations.glb' },
   shark: { key: 'shark', label: 'Shark source', rig: '/rigs/rig-shark.glb', animations: '/animations/shark-animations.glb' },
-  shibainu: { key: 'shibainu', label: 'Shiba Inu source', rig: '/rigs/rig-shibainu.glb', animations: '/animations/shibainu-animations.glb' },
   snake: { key: 'snake', label: 'Snake source', rig: '/rigs/rig-snake.glb', animations: '/animations/snake-animations.glb' },
   spider: { key: 'spider', label: 'Spider source', rig: '/rigs/rig-spider.glb', animations: '/animations/spider-animations.glb' },
   stag: { key: 'stag', label: 'Stag source', rig: '/rigs/rig-stag.glb', animations: '/animations/stag-animations.glb' },
@@ -1021,6 +1030,106 @@ function stop_all_animation (): void {
   status.textContent = 'Animation stopped'
 }
 
+function load_persisted_leg_assignments (): Record<string, LegAssignment> {
+  try {
+    const raw = window.localStorage.getItem(LEG_ASSIGNMENTS_STORAGE_KEY)
+    if (raw === null) return {}
+    return JSON.parse(raw) as Record<string, LegAssignment>
+  } catch {
+    return {}
+  }
+}
+
+function persist_leg_assignment (signature: string, assignment: LegAssignment): void {
+  try {
+    const store = load_persisted_leg_assignments()
+    store[signature] = assignment
+    window.localStorage.setItem(LEG_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(store))
+  } catch (error) {
+    console.warn('Failed to persist leg assignments', error)
+  }
+}
+
+function try_restore_persisted_leg_assignment (): boolean {
+  if (procedural_animator === null) return false
+  const signature = procedural_animator.skeleton_signature()
+  const store = load_persisted_leg_assignments()
+  const saved = store[signature]
+  if (saved === undefined) return false
+  const ok = procedural_animator.set_leg_chains_from_feet(saved)
+  if (ok) {
+    populate_chain_debug()
+    return true
+  }
+  return false
+}
+
+function start_leg_assignment (): void {
+  if (procedural_animator === null) {
+    status.textContent = 'Load a model with a skeleton before assigning legs'
+    return
+  }
+  leg_assign_mode_active = true
+  leg_assign_pending = {}
+  leg_assign_step_index = 0
+  assign_legs_button?.classList.add('active')
+  prompt_next_leg_assignment()
+}
+
+function prompt_next_leg_assignment (): void {
+  const slot = LEG_SLOT_ORDER[leg_assign_step_index]
+  status.textContent = `Click the ${LEG_SLOT_LABELS[slot]} foot bone (${leg_assign_step_index + 1}/4)`
+}
+
+function cancel_leg_assignment (): void {
+  leg_assign_mode_active = false
+  leg_assign_pending = {}
+  leg_assign_step_index = 0
+  assign_legs_button?.classList.remove('active')
+}
+
+function record_leg_assignment_click (bone_name: string): void {
+  const slot = LEG_SLOT_ORDER[leg_assign_step_index]
+  leg_assign_pending[slot] = bone_name
+  leg_assign_step_index += 1
+
+  if (leg_assign_step_index < LEG_SLOT_ORDER.length) {
+    prompt_next_leg_assignment()
+    return
+  }
+
+  const assignment = leg_assign_pending as LegAssignment
+  if (procedural_animator === null) {
+    cancel_leg_assignment()
+    return
+  }
+
+  const ok = procedural_animator.set_leg_chains_from_feet(assignment)
+  cancel_leg_assignment()
+
+  if (!ok) {
+    status.textContent = 'Failed to assign legs — pick bones with at least 2 ancestors'
+    return
+  }
+
+  persist_leg_assignment(procedural_animator.skeleton_signature(), assignment)
+  populate_chain_debug()
+  status.textContent = `Legs assigned: FL=${assignment.fl}, FR=${assignment.fr}, RL=${assignment.rl}, RR=${assignment.rr}`
+}
+
+function reset_legs_to_auto (): void {
+  if (procedural_animator === null) {
+    status.textContent = 'Load a model with a skeleton first'
+    return
+  }
+  procedural_animator.reset_to_auto_detection()
+  populate_chain_debug()
+  const count = procedural_animator.leg_chain_count()
+  status.textContent = count > 0
+    ? `Auto-detected ${count} leg chain${count === 1 ? '' : 's'}`
+    : 'No legs auto-detected — use Assign legs to set them manually'
+}
+
 function update_skeleton_overlay (): void {
   if (skeleton_group === null) return
 
@@ -1100,6 +1209,7 @@ function prepare_for_asset_load (label: string): void {
   last_octopus_motion_mode = null
   procedural_animator = null
   octopus_animator = null
+  if (leg_assign_mode_active) cancel_leg_assignment()
   set_selected_bone(null)
   chain_list.innerHTML = ''
   mapping_table.innerHTML = ''
@@ -1135,6 +1245,7 @@ function setup_loaded_gltf (gltf: { scene: THREE.Object3D, animations: THREE.Ani
       octopus_animator = new GeneratedOctopusAnimator(active_skinned_mesh)
     } else {
       procedural_animator = new GeneratedQuadrupedAnimator(active_skinned_mesh)
+      try_restore_persisted_leg_assignment()
     }
     populate_chain_debug()
     animation_mixer = new THREE.AnimationMixer(active_skinned_mesh)
@@ -1148,7 +1259,11 @@ function setup_loaded_gltf (gltf: { scene: THREE.Object3D, animations: THREE.Ani
   fit_camera(current)
   const bone_count = skinned_meshes[0]?.skeleton.bones.length ?? 0
   const rig_note = bone_count > 0 ? `${bone_count} bones` : 'visual mesh only'
-  status.textContent = `${label}: ${rig_note}, ${gltf.animations.length} clips`
+  const leg_count = procedural_animator?.leg_chain_count() ?? 0
+  const leg_warning = (!is_octopus && bone_count > 0 && leg_count < 4)
+    ? ` — only ${leg_count} legs auto-detected, use "Assign legs" to fix`
+    : ''
+  status.textContent = `${label}: ${rig_note}, ${gltf.animations.length} clips${leg_warning}`
 }
 
 async function load_lion (kind: LionKind): Promise<void> {
@@ -1308,6 +1423,22 @@ reset_map_button.addEventListener('click', () => {
     status.textContent = 'Reset generated bone map'
   }
 })
+assign_legs_button?.addEventListener('click', () => {
+  if (leg_assign_mode_active) {
+    cancel_leg_assignment()
+    status.textContent = 'Leg assignment cancelled'
+    return
+  }
+  if (skeleton_group !== null && !skeleton_toggle.checked) {
+    skeleton_toggle.checked = true
+    skeleton_group.visible = true
+  }
+  start_leg_assignment()
+})
+auto_detect_legs_button?.addEventListener('click', () => {
+  if (leg_assign_mode_active) cancel_leg_assignment()
+  reset_legs_to_auto()
+})
 
 ;[bone_rx, bone_ry, bone_rz, bone_px, bone_py, bone_pz].forEach((input) => {
   if (input === null) return
@@ -1339,6 +1470,16 @@ renderer.domElement.addEventListener('pointerleave', () => {
 })
 renderer.domElement.addEventListener('click', (event) => {
   const bone_name = pick_bone_from_pointer(event)
+
+  if (leg_assign_mode_active) {
+    if (bone_name === null) {
+      status.textContent = 'Click a skeleton bone (try toggling the skeleton overlay on)'
+      return
+    }
+    record_leg_assignment_click(bone_name)
+    return
+  }
+
   set_selected_bone(bone_name)
   if (bone_name === null) {
     bone_tooltip.style.display = 'none'

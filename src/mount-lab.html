@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mount Lab - Mesh2Motion</title>
+    <link rel="icon" type="image/png" href="./images/favicon.png" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #233847;
+        color: #fff;
+        font: 14px Jost, system-ui, sans-serif;
+      }
+
+      nav {
+        position: fixed;
+        z-index: 5;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        background: #1c3445;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+        box-sizing: border-box;
+      }
+
+      nav div {
+        display: inline-flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      nav a,
+      nav span {
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      nav .active-nav-item {
+        color: #ffd166;
+      }
+
+      #mount-toolbar,
+      #mount-inspector {
+        position: fixed;
+        z-index: 3;
+        top: 70px;
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        background: rgba(28, 52, 69, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        backdrop-filter: blur(12px);
+      }
+
+      #mount-toolbar {
+        left: 16px;
+        width: min(340px, calc(100vw - 32px));
+      }
+
+      #mount-inspector {
+        right: 16px;
+        width: min(310px, calc(100vw - 32px));
+      }
+
+      label {
+        display: grid;
+        gap: 5px;
+      }
+
+      select,
+      button,
+      .file-button {
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #426074;
+        color: #fff;
+      }
+
+      button,
+      .file-button {
+        cursor: pointer;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button.active {
+        background: #af3abe;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      input[type="number"] {
+        width: 84px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 6px;
+        padding: 7px;
+        background: #2b4353;
+        color: #fff;
+      }
+
+      .axis-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      #status {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 3;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(28, 52, 69, 0.88);
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div>
+        <a href="/"><img src="/images/mesh2motion.svg" width="180" alt="Mesh2Motion"></a>
+        <a href="/">Explore</a>
+        <a href="/create.html">Use Your Model</a>
+        <a href="/retarget/index.html">Use Your Rigged Model</a>
+        <a href="/generated-motion.html">Generated Motion Lab</a>
+        <span class="active-nav-item">Mount Lab</span>
+      </div>
+    </nav>
+
+    <section id="mount-toolbar">
+      <label>Animal
+        <select id="animal-select">
+          <option value="/models/model-animated-horse-body.glb">Animated horse body</option>
+          <option value="/models/model-german-shepherd.glb">German Shepherd</option>
+          <option value="/models/model-husky.glb">Husky</option>
+          <option value="/models/model-horseq.glb">Horse</option>
+          <option value="/models/model-bull.glb">Bull</option>
+          <option value="/models/model-stag.glb">Stag</option>
+        </select>
+      </label>
+      <div class="button-row">
+        <label class="file-button" for="animal-upload">Upload animal</label>
+        <input id="animal-upload" type="file" accept=".glb,.gltf">
+      </div>
+
+      <label>Mount
+        <select id="mount-select">
+          <option value="/mounts/horse-tack/horse-saddle-bridle.glb">Horse saddle + bridle</option>
+        </select>
+      </label>
+      <div class="button-row">
+        <label class="file-button" for="mount-upload">Upload mount</label>
+        <input id="mount-upload" type="file" accept=".glb,.gltf">
+      </div>
+
+      <div class="button-row">
+        <button id="tool-translate" type="button" class="active">Move</button>
+        <button id="tool-rotate" type="button">Rotate</button>
+        <button id="tool-scale" type="button">Scale</button>
+      </div>
+
+      <div class="button-row">
+        <button id="download-mount" type="button">Download mount</button>
+        <button id="download-scene" type="button">Download scene</button>
+      </div>
+    </section>
+
+    <section id="mount-inspector">
+      <label>Position</label>
+      <div class="axis-grid">
+        <input id="pos-x" type="number" step="0.01">
+        <input id="pos-y" type="number" step="0.01">
+        <input id="pos-z" type="number" step="0.01">
+      </div>
+      <label>Rotation</label>
+      <div class="axis-grid">
+        <input id="rot-x" type="number" step="1">
+        <input id="rot-y" type="number" step="1">
+        <input id="rot-z" type="number" step="1">
+      </div>
+      <label>Scale</label>
+      <div class="axis-grid">
+        <input id="scale-x" type="number" step="0.01">
+        <input id="scale-y" type="number" step="0.01">
+        <input id="scale-z" type="number" step="0.01">
+      </div>
+      <div class="button-row">
+        <button id="reset-mount" type="button">Reset mount</button>
+      </div>
+    </section>
+
+    <div id="status">Loading mount lab...</div>
+    <script type="module" src="/mount-lab.ts"></script>
+  </body>
+</html>

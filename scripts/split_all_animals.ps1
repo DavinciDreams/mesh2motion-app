@@ -26,9 +26,7 @@ $Animals = [ordered]@{
     'Donkey'      = 'donkey'
     'Fox'         = 'foxq'           # 'foxq' to avoid clash with existing fox
     'Horse'       = 'horseq'         # 'horseq' to avoid clash with existing horse work
-    'Horse_White' = 'horsewhite'
     'Husky'       = 'husky'
-    'ShibaInu'    = 'shibainu'
     'Stag'        = 'stag'
 }
 

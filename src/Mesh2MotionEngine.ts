@@ -641,9 +641,14 @@ export class Mesh2MotionEngine {
         this.transform_controls_type = TransformControlType.Translation
         this.transform_controls.setMode('translate')
         break
+      case 'rotate':
       case 'rotation':
         this.transform_controls_type = TransformControlType.Rotation
         this.transform_controls.setMode('rotate')
+        this.edit_skeleton_step.set_mesh_drag_placement_enabled(false)
+        if (this.ui.dom_mesh_drag_placement_checkbox !== null) {
+          this.ui.dom_mesh_drag_placement_checkbox.checked = false
+        }
         break
       default:
         console.warn(`Unknown transform mode selected: ${radio_button_selected}`)
