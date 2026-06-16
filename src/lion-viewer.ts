@@ -95,7 +95,6 @@ const octopus_squirt_button = document.querySelector('#octopus-squirt') as HTMLB
 const stop_animation_button = document.querySelector('#stop-animation') as HTMLButtonElement
 const save_motion_button = document.querySelector('#save-motion') as HTMLButtonElement | null
 const custom_model_input = document.querySelector('#custom-model-input') as HTMLInputElement | null
-const animal_kingdom_select = document.querySelector('#animal-kingdom-select') as HTMLSelectElement | null
 const swap_front_back_button = document.querySelector('#swap-front-back') as HTMLButtonElement
 const reset_map_button = document.querySelector('#reset-map') as HTMLButtonElement
 const assign_legs_button = document.querySelector('#assign-legs') as HTMLButtonElement | null
@@ -234,21 +233,6 @@ const labels: Record<LionKind, string> = {
   'samoyed-smallholes': 'Samoyed small holes',
   'samoyed-user-ref': 'Samoyed user ref',
   'samoyed-user-ref-rig': 'Samoyed user ref rig'
-}
-
-const animal_kingdom_sources: Record<string, SourceAnimationData> = {
-  bird: { key: 'bird', label: 'Bird source', rig: '/rigs/rig-bird.glb', animations: '/animations/bird-animations.glb' },
-  bull: { key: 'bull', label: 'Bull source', rig: '/rigs/rig-bull.glb', animations: '/animations/bull-animations.glb' },
-  dragon: { key: 'dragon', label: 'Dragon source', rig: '/rigs/rig-dragon.glb', animations: '/animations/dragon-animations.glb' },
-  fox: { key: 'fox', label: 'Fox source', rig: '/rigs/rig-fox.glb', animations: '/animations/fox-animations.glb' },
-  horseq: { key: 'horseq', label: 'Horse source', rig: '/rigs/rig-horseq.glb', animations: '/animations/horseq-animations.glb' },
-  husky: { key: 'husky', label: 'Husky source', rig: '/rigs/rig-husky.glb', animations: '/animations/husky-animations.glb' },
-  kaiju: { key: 'kaiju', label: 'Kaiju source', rig: '/rigs/rig-kaiju.glb', animations: '/animations/kaiju-animations.glb' },
-  shark: { key: 'shark', label: 'Shark source', rig: '/rigs/rig-shark.glb', animations: '/animations/shark-animations.glb' },
-  snake: { key: 'snake', label: 'Snake source', rig: '/rigs/rig-snake.glb', animations: '/animations/snake-animations.glb' },
-  spider: { key: 'spider', label: 'Spider source', rig: '/rigs/rig-spider.glb', animations: '/animations/spider-animations.glb' },
-  stag: { key: 'stag', label: 'Stag source', rig: '/rigs/rig-stag.glb', animations: '/animations/stag-animations.glb' },
-  wolf: { key: 'wolf', label: 'Wolf source', rig: '/rigs/rig-wolf.glb', animations: '/animations/wolf-animations.glb' }
 }
 
 const source_data_by_kind: Partial<Record<LionKind, SourceAnimationData>> = {
@@ -1299,21 +1283,6 @@ async function load_custom_animal (file: File): Promise<void> {
   }
 }
 
-async function load_animal_kingdom_asset (label: string, url: string, source_key: string): Promise<void> {
-  current_asset_label = label
-  set_active_asset_button(null)
-  prepare_for_asset_load(current_asset_label)
-
-  try {
-    await load_source_animation_assets(animal_kingdom_sources[source_key] ?? default_source_data)
-    const gltf = await loader.loadAsync(url)
-    setup_loaded_gltf(gltf, current_asset_label, false)
-  } catch (error) {
-    console.error(error)
-    status.textContent = `Failed to load ${current_asset_label}`
-  }
-}
-
 skeleton_toggle.addEventListener('change', () => {
   if (skeleton_group !== null) skeleton_group.visible = skeleton_toggle.checked
 })
@@ -1353,14 +1322,6 @@ custom_model_input?.addEventListener('change', () => {
   const file = custom_model_input.files?.[0]
   if (file === undefined) return
   void load_custom_animal(file)
-})
-animal_kingdom_select?.addEventListener('change', () => {
-  const option = animal_kingdom_select.selectedOptions[0]
-  const url = option?.value ?? ''
-  if (url === '') return
-  const label = option.dataset.label ?? option.textContent ?? 'Animal'
-  const source_key = option.dataset.source ?? 'wolf'
-  void load_animal_kingdom_asset(label, url, source_key)
 })
 play_animation_button.addEventListener('click', () => {
   if (animation_mixer === null || active_skinned_mesh === null) return
