@@ -3,9 +3,9 @@ Split an FBX mesh plus matching FBX animation clips into Mesh2Motion assets.
 
 Run headlessly via Blender:
   blender --background --python scripts/split_fbx_animation_pack.py -- \
-      --mesh "C:/path/Mesh/SK_GermanShepherd_01.fbx" \
+      --mesh "C:/path/Mesh/SK_Animal_01.fbx" \
       --animations-dir "C:/path/Animations" \
-      --slug german-shepherd \
+      --slug animal \
       --project-root "C:/repo/mesh2motion-app"
 """
 
@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Split an FBX animation pack into GLB rig/model/animation files.")
     parser.add_argument("--mesh", required=True, help="Base skinned mesh FBX")
     parser.add_argument("--animations-dir", required=True, help="Directory containing animation FBX files")
-    parser.add_argument("--slug", required=True, help="Output slug, e.g. german-shepherd")
+    parser.add_argument("--slug", required=True, help="Output slug, e.g. animal")
     parser.add_argument("--project-root", default=None, help="Project root; defaults to script parent.parent")
     return parser.parse_args(argv)
 

@@ -5,8 +5,24 @@
     top: 3rem;
     gap: 0;
     margin: 1rem;
+    max-height: calc(100vh - 5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     position: fixed;
     z-index: 1; /* put it above the 3d gizmo if they overlap on small screen */
+}
+
+.model-selection-section::-webkit-scrollbar {
+    width: 0.5rem;
+}
+
+.model-selection-section::-webkit-scrollbar-track {
+    background: var(--nav-background);
+}
+
+.model-selection-section::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--text-alternate) 45%, transparent);
+    border-radius: 999px;
 }
 
 .model-selection-section button:first-child {
@@ -19,6 +35,7 @@
 }
 
 .model-selection-section button {
+    flex: 0 0 auto;
     height: 3rem;
     background: none;
     box-shadow: none;
