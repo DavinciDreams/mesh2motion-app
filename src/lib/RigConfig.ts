@@ -13,6 +13,7 @@ export interface RigConfigEntry {
   // The bone used for position tracking (e.g., 'hips' or 'head'). 
   // we only have one bone per rig that we allow position keyframes (besides root)
   position_tracking_bone_name: string 
+  preserve_all_position_tracks?: boolean // Some source rigs rely on animated bone translations.
   model_variations?: ModelVariation[] // similar models (human, zombie, etc)
 }
 
@@ -277,6 +278,7 @@ export class RigConfig {
       has_head_weight_correction: false,
       has_arm_extension: false,
       position_tracking_bone_name: 'Body',
+      preserve_all_position_tracks: true,
     } satisfies RigConfigEntry,
     {
       skeleton_type: SkeletonType.Donkey,
@@ -289,6 +291,20 @@ export class RigConfig {
       has_head_weight_correction: false,
       has_arm_extension: false,
       position_tracking_bone_name: 'Body',
+      preserve_all_position_tracks: true,
+    } satisfies RigConfigEntry,
+    {
+      skeleton_type: SkeletonType.Frog,
+      model_file: 'models/model-frog.glb',
+      rig_file: 'rigs/rig-frog.glb',
+      rig_display_name: 'Frog',
+      animation_files: ['../animations/frog-animations.glb'],
+      animation_preview_folder: 'frog',
+      has_hand_options: false,
+      has_head_weight_correction: false,
+      has_arm_extension: false,
+      position_tracking_bone_name: 'Body',
+      preserve_all_position_tracks: true,
     } satisfies RigConfigEntry,
     {
       skeleton_type: SkeletonType.HorseQ,
@@ -315,6 +331,19 @@ export class RigConfig {
       position_tracking_bone_name: 'Body',
     } satisfies RigConfigEntry,
     {
+      skeleton_type: SkeletonType.Rat,
+      model_file: 'models/model-rat.glb',
+      rig_file: 'rigs/rig-rat.glb',
+      rig_display_name: 'Rat',
+      animation_files: ['../animations/rat-animations.glb'],
+      animation_preview_folder: 'rat',
+      has_hand_options: false,
+      has_head_weight_correction: false,
+      has_arm_extension: false,
+      position_tracking_bone_name: 'Body',
+      preserve_all_position_tracks: true,
+    } satisfies RigConfigEntry,
+    {
       skeleton_type: SkeletonType.Stag,
       model_file: 'models/model-stag.glb',
       rig_file: 'rigs/rig-stag.glb',
@@ -325,6 +354,19 @@ export class RigConfig {
       has_head_weight_correction: false,
       has_arm_extension: false,
       position_tracking_bone_name: 'Body',
+    } satisfies RigConfigEntry,
+    {
+      skeleton_type: SkeletonType.Wasp,
+      model_file: 'models/model-wasp.glb',
+      rig_file: 'rigs/rig-wasp.glb',
+      rig_display_name: 'Wasp',
+      animation_files: ['../animations/wasp-animations.glb'],
+      animation_preview_folder: 'wasp',
+      has_hand_options: false,
+      has_head_weight_correction: false,
+      has_arm_extension: false,
+      position_tracking_bone_name: 'Body',
+      preserve_all_position_tracks: true,
     } satisfies RigConfigEntry
   ]
 

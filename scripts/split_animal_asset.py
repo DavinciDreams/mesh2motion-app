@@ -86,6 +86,27 @@ def skinned_meshes_for(armature):
     return meshes
 
 
+def skin_bone_parented_meshes(meshes, armature) -> None:
+    """Convert bone-parented accessory meshes into single-bone skinned meshes."""
+    for mesh in meshes:
+        if mesh.parent != armature or mesh.parent_type != "BONE" or not mesh.parent_bone:
+            continue
+
+        bone_name = mesh.parent_bone
+        world_matrix = mesh.matrix_world.copy()
+        mesh.parent_type = "OBJECT"
+        mesh.parent_bone = ""
+        mesh.matrix_world = world_matrix
+
+        vertex_group = mesh.vertex_groups.get(bone_name) or mesh.vertex_groups.new(name=bone_name)
+        vertex_group.add([vertex.index for vertex in mesh.data.vertices], 1.0, "REPLACE")
+
+        armature_modifier = next((mod for mod in mesh.modifiers if mod.type == "ARMATURE"), None)
+        if armature_modifier is None:
+            armature_modifier = mesh.modifiers.new(name="Armature", type="ARMATURE")
+        armature_modifier.object = armature
+
+
 def select_only(obj) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
@@ -224,6 +245,8 @@ def main() -> int:
         return 3
     if len(meshes) == 0:
         meshes = [mesh]
+
+    skin_bone_parented_meshes(meshes, armature)
 
     print(f"[{slug}] Armature: {armature.name!r} ({len(armature.data.bones)} bones)")
     print(f"[{slug}] Meshes:   {', '.join(f'{m.name} ({len(m.data.vertices)} verts)' for m in meshes)}")

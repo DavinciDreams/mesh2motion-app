@@ -12,9 +12,12 @@ export enum SkeletonType {
   Bull = 'bull',
   Deer = 'deer',
   Donkey = 'donkey',
+  Frog = 'frog',
   HorseQ = 'horseq',
   Husky = 'husky',
+  Rat = 'rat',
   Stag = 'stag',
+  Wasp = 'wasp',
   Error = 'error',
   None = 'none'
 }

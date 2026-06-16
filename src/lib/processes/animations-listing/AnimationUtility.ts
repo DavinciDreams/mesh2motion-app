@@ -45,8 +45,14 @@ export class AnimationUtility {
       const preserve_root_position: boolean = animation_clip.name.toLowerCase().endsWith('rm')
 
       // get position tracking bone name for normal movement (probably hips or head in the case of a snake)
-      const position_tracking_bone_name: string | undefined = 
-        RigConfig.by_skeleton_type(skeleton_type)?.position_tracking_bone_name
+      const rig_config = RigConfig.by_skeleton_type(skeleton_type)
+      const position_tracking_bone_name = rig_config?.position_tracking_bone_name.toLowerCase()
+
+      if (rig_config?.preserve_all_position_tracks === true) {
+        animation_clip.tracks = animation_clip.tracks
+          .filter((x: KeyframeTrack) => x.name.includes('quaternion') || x.name.includes('.position'))
+        return
+      }
 
       if (preserve_root_position) {
         rotation_tracks = animation_clip.tracks
@@ -135,12 +141,10 @@ export class AnimationUtility {
       for (let i = 0; i < tracks.length; i++) {
         const track = tracks[i]
         const track_name = track.name
+        const mirrored_track_name = this.right_side_track_name_for_left_track(track_name)
 
-        // Check if this is a left track that we haven't already processed
-        if (track_name.toLowerCase().endsWith('_l.quaternion')) {
-          // Find the corresponding right track
-          const right_track_name = track_name.replace(/_l\.quaternion$/, '_r.quaternion')
-          const right_track_index = tracks.findIndex(t => t.name.toLowerCase() === right_track_name)
+        if (mirrored_track_name !== null) {
+          const right_track_index = tracks.findIndex(t => t.name.toLowerCase() === mirrored_track_name)
 
           if (right_track_index !== -1) {
             track_swaps.push({ leftIndex: i, rightIndex: right_track_index, clipDetails: clip_name + ':' + track_name })
@@ -159,9 +163,19 @@ export class AnimationUtility {
         const left_times = left_track.times.slice()
         const right_times = right_track.times.slice()
 
-        // Mirror the quaternions before swapping
-        const mirrored_left_values = this.mirror_quaternion_track_values(left_values)
-        const mirrored_right_values = this.mirror_quaternion_track_values(right_values)
+        const is_quaternion_track = left_track.name.endsWith('.quaternion')
+        const is_position_track = left_track.name.endsWith('.position')
+
+        const mirrored_left_values = is_quaternion_track
+          ? this.mirror_quaternion_track_values(left_values)
+          : is_position_track
+            ? this.mirror_position_track_values(left_values)
+            : left_values
+        const mirrored_right_values = is_quaternion_track
+          ? this.mirror_quaternion_track_values(right_values)
+          : is_position_track
+            ? this.mirror_position_track_values(right_values)
+            : right_values
 
         // Swap the mirrored track values and times
         left_track.values = mirrored_right_values
@@ -173,6 +187,23 @@ export class AnimationUtility {
 
     this.apply_center_bone_mirroring(animation_clips)
     this.apply_hips_position_mirroring(animation_clips)
+  }
+
+  private static right_side_track_name_for_left_track (track_name: string): string | null {
+    const lower_track_name = track_name.toLowerCase()
+    if (lower_track_name.endsWith('_l.quaternion')) {
+      return lower_track_name.replace(/_l\.quaternion$/, '_r.quaternion')
+    }
+    if (lower_track_name.endsWith('_l.position')) {
+      return lower_track_name.replace(/_l\.position$/, '_r.position')
+    }
+    if (lower_track_name.endsWith('.l.quaternion')) {
+      return lower_track_name.replace(/\.l\.quaternion$/, '.r.quaternion')
+    }
+    if (lower_track_name.endsWith('.l.position')) {
+      return lower_track_name.replace(/\.l\.position$/, '.r.position')
+    }
+    return null
   }
 
   /**
@@ -202,6 +233,17 @@ export class AnimationUtility {
       mirrored_values[i + 1] = quat.y
       mirrored_values[i + 2] = quat.z
       mirrored_values[i + 3] = quat.w
+    }
+
+    return mirrored_values
+  }
+
+  private static mirror_position_track_values (values: Float32Array): Float32Array {
+    const mirrored_values = values.slice()
+    const units_in_position = 3
+
+    for (let i = 0; i < values.length; i += units_in_position) {
+      mirrored_values[i] = -mirrored_values[i]
     }
 
     return mirrored_values
