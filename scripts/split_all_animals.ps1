@@ -19,9 +19,7 @@ $SplitScript = Join-Path $PSScriptRoot 'split_animal_asset.py'
 # Map of source-file stem -> slug used in output filenames.
 # Slugs are lowercase and use no underscores so they read cleanly in the UI dropdown.
 $Animals = [ordered]@{
-    'Alpaca'      = 'alpaca'
     'Bull'        = 'bull'
-    'Cow'         = 'cow'
     'Deer'        = 'deer'
     'Donkey'      = 'donkey'
     'Fox'         = 'foxq'           # 'foxq' to avoid clash with existing fox
