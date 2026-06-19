@@ -66,7 +66,33 @@ export class AnimationUtility {
       }
 
       animation_clip.tracks = rotation_tracks // update track data
+      this.remove_suppressed_animation_bone_tracks(animation_clip, rig_config?.suppressed_animation_bone_names ?? [])
     })
+  }
+
+  private static remove_suppressed_animation_bone_tracks (
+    animation_clip: AnimationClip,
+    suppressed_bone_names: string[]
+  ): void {
+    if (suppressed_bone_names.length === 0) {
+      return
+    }
+
+    const suppressed = new Set(suppressed_bone_names.map(name => name.toLowerCase()))
+    animation_clip.tracks = animation_clip.tracks.filter((track: KeyframeTrack) => {
+      const bone_name = this.bone_name_from_track_name(track.name).toLowerCase()
+      return !suppressed.has(bone_name)
+    })
+  }
+
+  private static bone_name_from_track_name (track_name: string): string {
+    const bones_match = track_name.match(/\.bones\[("?)([^\]"]+)\1\]\./)
+    if (bones_match !== null) {
+      return bones_match[2]
+    }
+
+    const first_dot = track_name.indexOf('.')
+    return first_dot === -1 ? track_name : track_name.slice(0, first_dot)
   }
 
   static apply_arm_extension_warp (animation_clips: TransformedAnimationClipPair[], percentage: number): void {

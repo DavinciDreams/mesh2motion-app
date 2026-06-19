@@ -59,11 +59,13 @@ export class BoneClassifier {
     const name = bone.name.toLowerCase()
 
 
-    // Extremity bones: hands, feet, fingers, toes
+    // Extremity bones: hands, feet, fingers, toes, and tight face controls.
+    // Wide torso smoothing across animated mouth/head bones can collapse snouts.
     const extremity_keywords = [
       'hand', 'foot', 'toe', 'ball',
       'thumb', 'index', 'middle', 'ring', 'pinky', 'finger',
-      'eye', 'tongue', 'wing', 'feather'
+      'eye', 'tongue', 'wing', 'feather',
+      'head', 'neck', 'mouth', 'jaw', 'snout', 'chin', 'teeth'
     ]
     if (extremity_keywords.some(kw => name.includes(kw))) {
       return BoneCategory.Extremity
@@ -83,8 +85,8 @@ export class BoneClassifier {
     // tails and feathers aren't technically torso, but we want
     // to give them more smoothing since they aren't as rigid
     const torso_keywords = [
-      'spine', 'chest', 'hips', 'pelvis', 'neck', 'torso', 'abdomen', 'body',
-      'tail', 'head', 'mouth', 'stomach', 'chin', 'teeth'
+      'spine', 'chest', 'hips', 'pelvis', 'torso', 'abdomen', 'body',
+      'tail', 'stomach'
     ]
     if (torso_keywords.some(kw => name.includes(kw))) {
       return BoneCategory.Torso

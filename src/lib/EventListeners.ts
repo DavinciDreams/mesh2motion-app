@@ -218,16 +218,6 @@ export class EventListeners {
 
       this.bootstrap.set_model_gizmo_mode(mode)
 
-      // only show the angle-snap control while in rotate mode
-      if (this.bootstrap.ui.dom_model_rotation_snap_container !== null) {
-        this.bootstrap.ui.dom_model_rotation_snap_container.style.display = mode === 'rotate' ? 'flex' : 'none'
-      }
-    })
-
-    // model rotation angle snap selection
-    this.bootstrap.ui.dom_model_rotation_snap_select?.addEventListener('change', (event: Event) => {
-      const value = (event.target as HTMLSelectElement | null)?.value ?? 'none'
-      this.bootstrap.set_model_rotation_snap(value === 'none' ? null : Number(value))
     })
 
     this.bootstrap.ui.dom_mesh_drag_placement_checkbox?.addEventListener('change', (event: Event) => {

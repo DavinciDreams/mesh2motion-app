@@ -14,6 +14,7 @@ export interface RigConfigEntry {
   // we only have one bone per rig that we allow position keyframes (besides root)
   position_tracking_bone_name: string 
   preserve_all_position_tracks?: boolean // Some source rigs rely on animated bone translations.
+  suppressed_animation_bone_names?: string[] // Bone animation tracks to leave in bind pose for this rig.
   model_variations?: ModelVariation[] // similar models (human, zombie, etc)
 }
 
@@ -101,6 +102,7 @@ export class RigConfig {
       has_head_weight_correction: false,
       has_arm_extension: false,
       position_tracking_bone_name: 'hips',
+      suppressed_animation_bone_names: ['Chin', 'Chin_Tip'],
       model_variations: [
         {
           model_file: 'models-variation/fox-base.glb',

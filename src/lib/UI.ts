@@ -18,10 +18,8 @@ export class UI {
   dom_reset_model_position_button: HTMLButtonElement | null = null
   dom_auto_align_model_button: HTMLButtonElement | null = null
 
-  // model positioning gizmo: move/rotate toggle + rotation snap (Blender-style)
+  // model positioning gizmo: move/rotate toggle (Blender-style)
   dom_model_gizmo_mode_group: HTMLElement | null = null
-  dom_model_rotation_snap_select: HTMLSelectElement | null = null
-  dom_model_rotation_snap_container: HTMLElement | null = null
 
   dom_load_skeleton_tools: HTMLElement | null = null
   dom_load_skeleton_button: HTMLButtonElement | null = null
@@ -149,10 +147,8 @@ export class UI {
     this.dom_reset_model_position_button = document.querySelector('#reset-model-position-button')
     this.dom_auto_align_model_button = document.querySelector('#auto-align-model-button')
 
-    // model positioning gizmo move/rotate toggle and rotation snap
+    // model positioning gizmo move/rotate toggle
     this.dom_model_gizmo_mode_group = document.querySelector('#model-gizmo-mode-group')
-    this.dom_model_rotation_snap_select = document.querySelector('#model-rotation-snap-select')
-    this.dom_model_rotation_snap_container = document.querySelector('#model-rotation-snap-container')
 
     // UI controls for loading/working with skeleton
     this.dom_load_skeleton_tools = document.querySelector('#load-skeleton-tools')

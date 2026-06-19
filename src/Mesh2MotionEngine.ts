@@ -323,8 +323,7 @@ export class Mesh2MotionEngine {
     this.transform_controls.setMode('translate')
     this.transform_controls.enabled = true
 
-    // the model gizmo always starts in move mode; sync the toolbar toggle and
-    // hide the rotation-snap control until the user switches to rotate
+    // the model gizmo always starts in move mode; sync the toolbar toggle.
     if (this.ui.dom_model_gizmo_mode_group !== null) {
       const translate_radio = this.ui.dom_model_gizmo_mode_group
         .querySelector('input[value="translate"]') as HTMLInputElement | null
@@ -332,31 +331,18 @@ export class Mesh2MotionEngine {
         translate_radio.checked = true
       }
     }
-    if (this.ui.dom_model_rotation_snap_container !== null) {
-      this.ui.dom_model_rotation_snap_container.style.display = 'none'
-    }
+    this.transform_controls.setRotationSnap(null)
   }
 
   /**
    * Switch the model-positioning gizmo between move (translate) and Blender-style
-   * rotate. When entering rotate mode we apply the currently selected angle snap.
+   * rotate.
    */
   public set_model_gizmo_mode (mode: 'translate' | 'rotate'): void {
     if (!this.is_model_gizmo_active) { return }
 
     this.transform_controls.setMode(mode)
-
-    if (mode === 'rotate') {
-      const snap_select = this.ui.dom_model_rotation_snap_select
-      const snap_value = snap_select?.value ?? 'none'
-      this.set_model_rotation_snap(snap_value === 'none' ? null : Number(snap_value))
-    }
-  }
-
-  /** Set the rotation snap (in degrees) for the model gizmo. null disables snapping. */
-  public set_model_rotation_snap (snap_degrees: number | null): void {
-    const snap_radians = snap_degrees === null ? null : THREE.MathUtils.degToRad(snap_degrees)
-    this.transform_controls.setRotationSnap(snap_radians)
+    this.transform_controls.setRotationSnap(null)
   }
 
   /**
@@ -675,11 +661,13 @@ export class Mesh2MotionEngine {
       case 'translate':
         this.transform_controls_type = TransformControlType.Translation
         this.transform_controls.setMode('translate')
+        this.transform_controls.setRotationSnap(null)
         break
       case 'rotate':
       case 'rotation':
         this.transform_controls_type = TransformControlType.Rotation
         this.transform_controls.setMode('rotate')
+        this.transform_controls.setRotationSnap(null)
         this.edit_skeleton_step.set_mesh_drag_placement_enabled(false)
         if (this.ui.dom_mesh_drag_placement_checkbox !== null) {
           this.ui.dom_mesh_drag_placement_checkbox.checked = false
