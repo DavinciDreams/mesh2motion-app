@@ -73,7 +73,9 @@ export class EventListeners {
       }
 
       // edit skeleton step logic that deals with hovering over bones
-      if (this.bootstrap.process_step === ProcessStep.EditSkeleton) {
+      if (this.bootstrap.process_step === ProcessStep.EditSkeleton &&
+        !this.bootstrap.is_transform_controls_dragging &&
+        !this.bootstrap.is_mesh_drag_mode_dragging) {
         this.bootstrap.edit_skeleton_step.calculate_bone_hover_effect(event, this.bootstrap.camera, this.bootstrap.transform_controls_hover_distance)
       }
     })
@@ -117,7 +119,18 @@ export class EventListeners {
 
       // Store undo state when we start dragging (event.value = true)
       if (event.value && this.bootstrap.process_step === ProcessStep.EditSkeleton) {
+        this.bootstrap.suspend_weight_painted_preview_for_edit_drag()
         this.bootstrap.edit_skeleton_step.store_bone_state_for_undo()
+
+        if (this.bootstrap.transform_controls.getMode() === 'rotate') {
+          const selected_bone = this.bootstrap.transform_controls.object
+          if (selected_bone !== undefined && selected_bone !== null) {
+            const mirror_bone = this.bootstrap.edit_skeleton_step.is_mirror_mode_enabled()
+              ? this.bootstrap.edit_skeleton_step.find_mirror_bone(selected_bone as Bone)
+              : undefined
+            this.bootstrap.edit_skeleton_step.begin_limb_rotation_drag(selected_bone as Bone, mirror_bone)
+          }
+        }
 
         // Record children's initial world positions for independent bone movement
         if (this.bootstrap.edit_skeleton_step.independent_bone_movement.is_enabled()) {
@@ -128,6 +141,18 @@ export class EventListeners {
               : undefined
             this.bootstrap.edit_skeleton_step.independent_bone_movement.record_drag_start(selected_bone as Bone, mirror_bone)
           }
+        }
+      }
+
+      if (!event.value &&
+        this.bootstrap.process_step === ProcessStep.EditSkeleton &&
+        this.bootstrap.transform_controls.getMode() === 'rotate') {
+        const selected_bone = this.bootstrap.transform_controls.object
+        if (selected_bone !== undefined && selected_bone !== null) {
+          const mirror_bone = this.bootstrap.edit_skeleton_step.is_mirror_mode_enabled()
+            ? this.bootstrap.edit_skeleton_step.find_mirror_bone(selected_bone as Bone)
+            : undefined
+          this.bootstrap.edit_skeleton_step.bake_limb_rotation_drag(selected_bone as Bone, mirror_bone)
         }
       }
 
@@ -147,8 +172,13 @@ export class EventListeners {
       // if we stopped dragging, that means a mouse up.
       // if we are editing skeleton and viewing weight painted mesh, refresh the weight painting
       if (this.bootstrap.process_step === ProcessStep.EditSkeleton &&
-        this.bootstrap.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted) {
+        this.bootstrap.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted &&
+        this.bootstrap.transform_controls.getMode() !== 'rotate') {
         this.bootstrap.regenerate_weight_painted_preview_mesh()
+      }
+
+      if (!event.value && this.bootstrap.process_step === ProcessStep.EditSkeleton) {
+        this.bootstrap.resume_weight_painted_preview_after_edit_drag()
       }
     })
 

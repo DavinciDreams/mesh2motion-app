@@ -7,6 +7,7 @@ import { IndependentBoneMovement } from './IndependentBoneMovement.ts'
 import {
   Vector3,
   Euler,
+  Quaternion,
   Object3D,
   Skeleton,
   type Scene,
@@ -21,6 +22,20 @@ import {
 import { SkeletonType } from '../../enums/SkeletonType.ts'
 import { RigConfig } from '../../RigConfig.ts'
 import { BoneRules } from '../../BoneRules.ts'
+
+interface LimbRotationBoneSnapshot {
+  bone: Bone
+  world_position: Vector3
+  local_quaternion: Quaternion
+}
+
+interface LimbRotationSnapshot {
+  root: Bone
+  root_local_quaternion: Quaternion
+  root_start_world_quaternion: Quaternion
+  pivot_world_position: Vector3
+  descendants: LimbRotationBoneSnapshot[]
+}
 
 /*
  * StepEditSkeleton
@@ -58,6 +73,7 @@ export class StepEditSkeleton extends EventTarget {
   private _added_event_listeners: boolean = false
   private readonly preview_plane_manager: PreviewPlaneManager = PreviewPlaneManager.getInstance()
   public readonly independent_bone_movement: IndependentBoneMovement = new IndependentBoneMovement()
+  private readonly limb_rotation_snapshots: Map<string, LimbRotationSnapshot> = new Map<string, LimbRotationSnapshot>()
 
   constructor () {
     super()
@@ -99,6 +115,103 @@ export class StepEditSkeleton extends EventTarget {
       console.log('No redo states available')
     }
     return result
+  }
+
+  public begin_limb_rotation_drag (bone: Bone, mirror_bone?: Bone): void {
+    this.limb_rotation_snapshots.clear()
+    this.limb_rotation_snapshots.set(bone.uuid, this.create_limb_rotation_snapshot(bone))
+
+    if (mirror_bone !== undefined) {
+      this.limb_rotation_snapshots.set(mirror_bone.uuid, this.create_limb_rotation_snapshot(mirror_bone))
+    }
+  }
+
+  public bake_limb_rotation_drag (bone: Bone, mirror_bone?: Bone): void {
+    this.bake_limb_rotation_snapshot(bone)
+
+    if (mirror_bone !== undefined) {
+      this.bake_limb_rotation_snapshot(mirror_bone)
+    }
+
+    this.limb_rotation_snapshots.clear()
+    this.dispatchEvent(new CustomEvent('skeletonTransformed'))
+  }
+
+  private create_limb_rotation_snapshot (root: Bone): LimbRotationSnapshot {
+    root.updateWorldMatrix(true, true)
+
+    const root_start_world_quaternion = new Quaternion()
+    const pivot_world_position = new Vector3()
+    root.getWorldQuaternion(root_start_world_quaternion)
+    root.getWorldPosition(pivot_world_position)
+
+    return {
+      root,
+      root_local_quaternion: root.quaternion.clone(),
+      root_start_world_quaternion,
+      pivot_world_position,
+      descendants: this.collect_limb_rotation_descendants(root)
+    }
+  }
+
+  private collect_limb_rotation_descendants (root: Bone): LimbRotationBoneSnapshot[] {
+    const descendants: LimbRotationBoneSnapshot[] = []
+
+    root.traverse((child) => {
+      if (child === root || !(child instanceof Object3D) || child.type !== 'Bone') {
+        return
+      }
+
+      const bone = child as Bone
+      const world_position = new Vector3()
+      bone.getWorldPosition(world_position)
+
+      descendants.push({
+        bone,
+        world_position,
+        local_quaternion: bone.quaternion.clone()
+      })
+    })
+
+    return descendants
+  }
+
+  private bake_limb_rotation_snapshot (root: Bone): void {
+    const snapshot = this.limb_rotation_snapshots.get(root.uuid)
+
+    if (snapshot === undefined) {
+      return
+    }
+
+    root.updateWorldMatrix(true, true)
+
+    const root_end_world_quaternion = new Quaternion()
+    root.getWorldQuaternion(root_end_world_quaternion)
+
+    const world_rotation_delta = root_end_world_quaternion
+      .clone()
+      .multiply(snapshot.root_start_world_quaternion.clone().invert())
+
+    snapshot.root.quaternion.copy(snapshot.root_local_quaternion)
+    snapshot.root.updateWorldMatrix(true, true)
+
+    snapshot.descendants.forEach((descendant) => {
+      const target_world_position = descendant.world_position
+        .clone()
+        .sub(snapshot.pivot_world_position)
+        .applyQuaternion(world_rotation_delta)
+        .add(snapshot.pivot_world_position)
+
+      if (descendant.bone.parent !== null) {
+        const local_position = descendant.bone.parent.worldToLocal(target_world_position)
+        descendant.bone.position.copy(local_position)
+      }
+
+      descendant.bone.quaternion.copy(descendant.local_quaternion)
+      descendant.bone.updateWorldMatrix(true, true)
+    })
+
+    snapshot.root.updateWorldMatrix(true, true)
   }
 
   private update_ui_options_on_begin (skeleton_type: SkeletonType): void {

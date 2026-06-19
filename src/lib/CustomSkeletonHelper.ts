@@ -61,6 +61,7 @@ class CustomSkeletonHelper extends LineSegments {
 
     this.isSkeletonHelper = true
     this.type = 'CustomSkeletonHelper'
+    this.frustumCulled = false
 
     this.root = object
     this.bones = bones
@@ -99,6 +100,7 @@ class CustomSkeletonHelper extends LineSegments {
     }
 
     this.joint_points = new Points(pointsGeometry, pointsMaterial)
+    this.joint_points.frustumCulled = false
     this.add(this.joint_points)
   }
 
@@ -137,11 +139,6 @@ class CustomSkeletonHelper extends LineSegments {
 
     pointPositions.needsUpdate = true
     positions.needsUpdate = true
-
-    // Update bounding box and bounding sphere
-    // otherwise the skeleton will be hidden when root bone on ground is off camera
-    geometry.computeBoundingBox()
-    geometry.computeBoundingSphere()
 
     super.updateMatrixWorld(force)
   }

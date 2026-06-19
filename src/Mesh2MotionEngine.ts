@@ -75,6 +75,7 @@ export class Mesh2MotionEngine {
   public mesh_preview_display_type: ModelPreviewDisplay = ModelPreviewDisplay.WeightPainted
   public transform_controls_type: TransformControlType = TransformControlType.Translation
   public transform_space_type: TransformSpace = TransformSpace.Global
+  private is_edit_preview_suspended_for_drag: boolean = false
 
   private readonly clock = new THREE.Clock()
   private readonly scene_environment: SceneEnvironmentManager
@@ -635,6 +636,40 @@ export class Mesh2MotionEngine {
       this.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted
   }
 
+  public suspend_weight_painted_preview_for_edit_drag (): void {
+    if (this.process_step !== ProcessStep.EditSkeleton ||
+      this.mesh_preview_display_type !== ModelPreviewDisplay.WeightPainted ||
+      this.is_edit_preview_suspended_for_drag) {
+      return
+    }
+
+    this.is_edit_preview_suspended_for_drag = true
+    this.weight_skin_step.weight_painted_mesh_group().visible = false
+    this.load_model_step.model_meshes().visible = true
+  }
+
+  public resume_weight_painted_preview_after_edit_drag (): void {
+    if (!this.is_edit_preview_suspended_for_drag) {
+      return
+    }
+
+    this.is_edit_preview_suspended_for_drag = false
+    this.weight_skin_step.weight_painted_mesh_group().visible =
+      this.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted
+
+    if (this.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted) {
+      requestAnimationFrame(() => {
+        if (!this.is_edit_preview_suspended_for_drag &&
+          this.mesh_preview_display_type === ModelPreviewDisplay.WeightPainted) {
+          this.load_model_step.model_meshes().visible = false
+        }
+      })
+      return
+    }
+
+    this.load_model_step.model_meshes().visible = true
+  }
+
   public changed_transform_controls_mode (radio_button_selected: string): void {
     switch (radio_button_selected) {
       case 'translate':
@@ -649,11 +684,23 @@ export class Mesh2MotionEngine {
         if (this.ui.dom_mesh_drag_placement_checkbox !== null) {
           this.ui.dom_mesh_drag_placement_checkbox.checked = false
         }
+        this.attach_transform_controls_to_selected_bone()
         break
       default:
         console.warn(`Unknown transform mode selected: ${radio_button_selected}`)
         break
     }
+  }
+
+  private attach_transform_controls_to_selected_bone (): void {
+    const selected_bone = this.edit_skeleton_step.get_currently_selected_bone()
+
+    if (selected_bone === null || !this.edit_skeleton_step.is_bone_selectable(selected_bone)) {
+      return
+    }
+
+    this.transform_controls.enabled = this.process_step === ProcessStep.EditSkeleton
+    this.transform_controls.attach(selected_bone)
   }
 
   public changed_transform_controls_space (radio_button_selected: TransformSpace | undefined): void {
@@ -784,7 +831,9 @@ export class Mesh2MotionEngine {
 
     // remember our skeleton position before we do the skinning process
     // that way if we revert to try again...we will have the original positions/rotations
-    this.load_model_step.model_meshes().visible = false // hide our unskinned mesh after we have done the skinning process
+    if (!this.is_edit_preview_suspended_for_drag) {
+      this.load_model_step.model_meshes().visible = false // hide our unskinned mesh after we have done the skinning process
+    }
 
     // re-define skeleton helper to use the skinned mesh)
     if (this.weight_skin_step.skeleton() === undefined) {
